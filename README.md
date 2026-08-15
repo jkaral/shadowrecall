@@ -217,7 +217,7 @@ The interface currently presents this as an attribution score. It represents fie
 
 ## AI-use disclosure
 
-AI-assisted development tools were used for brainstorming, implementation support, debugging, testing, and documentation. The submitted application’s integration, comparison engine, interface, tests, and project decisions were assembled and verified during the hackathon.
+AI-assisted development tools were used for brainstorming, implementation support, debugging, testing, and documentation. The submitted application’s integration, comparison engine, interface, tests, and project decisions were assembled and verified during the hackathon. The developer used ChatGPT Sola 5.6 during the course of the hackathon for the above purposes.
 
 ## License
 
