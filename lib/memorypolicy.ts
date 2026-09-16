@@ -6,11 +6,16 @@ export type ActionDomain =
   | "task"
   | "none";
 
+export type Polarity =
+  | "positive"
+  | "negative";
+
 export type MemoryConstraint =
   | {
       domain: "schedule";
       attribute: "time";
       value: "morning";
+      polarity: Polarity;
       scope: string[];
       memory: Memory;
     }
@@ -18,6 +23,7 @@ export type MemoryConstraint =
       domain: "schedule";
       attribute: "location";
       value: "remote";
+      polarity: Polarity;
       scope: string[];
       memory: Memory;
     }
@@ -25,6 +31,7 @@ export type MemoryConstraint =
       domain: "message";
       attribute: "channel";
       value: "email";
+      polarity: Polarity;
       scope: string[];
       memory: Memory;
     }
@@ -32,6 +39,7 @@ export type MemoryConstraint =
       domain: "task";
       attribute: "priority";
       value: "high";
+      polarity: Polarity;
       scope: string[];
       memory: Memory;
     };
@@ -41,6 +49,7 @@ const STOP_WORDS = new Set([
   "an",
   "and",
   "are",
+  "as",
   "at",
   "be",
   "by",
@@ -63,31 +72,29 @@ const STOP_WORDS = new Set([
 ]);
 
 const GENERIC_SCOPE_WORDS = new Set([
-  "communicate",
+  "appointment",
+  "appointments",
   "communication",
-  "communicating",
+  "communications",
   "contact",
   "contacting",
-  "message",
   "meeting",
-  "appointment",
-  "talk",
-  "talking",
-  "speak",
+  "meetings",
+  "message",
+  "messages",
   "speaking",
-  "possible",
-  "whenever",
-  "timing",
-  "flexible",
+  "talking",
+  "session",
+  "sessions",
 ]);
 
-function normalizeToken(token: string): string {
+function normalizeToken(
+  token: string,
+): string {
   let result = token
     .toLowerCase()
     .replace(/[^a-z0-9-]/g, "");
 
-  // Very small amount of normalization so that
-  // "professors" and "professor" can match.
   if (
     result.length > 4 &&
     result.endsWith("s") &&
@@ -99,17 +106,25 @@ function normalizeToken(token: string): string {
   return result;
 }
 
-function tokenize(text: string): string[] {
+function tokenize(
+  text: string,
+): string[] {
   return text
     .split(/\s+/)
     .map(normalizeToken)
     .filter(Boolean)
-    .filter((token) => !STOP_WORDS.has(token));
+    .filter(
+      (token) =>
+        !STOP_WORDS.has(token),
+    );
 }
 
-function cleanScope(text: string): string[] {
+function cleanScope(
+  text: string,
+): string[] {
   return tokenize(text).filter(
-    (token) => !GENERIC_SCOPE_WORDS.has(token),
+    (token) =>
+      !GENERIC_SCOPE_WORDS.has(token),
   );
 }
 
@@ -117,15 +132,17 @@ function containsAny(
   text: string,
   phrases: string[],
 ): boolean {
-  return phrases.some((phrase) =>
-    text.includes(phrase),
+  return phrases.some(
+    (phrase) =>
+      text.includes(phrase),
   );
 }
 
 export function classifyInstruction(
   instruction: string,
 ): ActionDomain {
-  const text = instruction.toLowerCase();
+  const text =
+    instruction.toLowerCase();
 
   if (
     containsAny(text, [
@@ -165,191 +182,551 @@ export function classifyInstruction(
   return "none";
 }
 
-/**
- * Looks for an explicit contextual qualifier:
+/*
+ * Extract context such as:
  *
- * "prefers email WHEN communicating with professors"
- * "prefers morning meetings WITH family members"
- * "prefers remote meetings FOR tutoring sessions"
+ * "For alumni networking, ..."
+ * "with professors"
+ * "for tutoring sessions"
  */
-function extractMarkedScope(
+function extractScope(
   text: string,
 ): string[] {
-  const match = text.match(
-    /\b(?:with|for|when)\s+(.+)$/i,
-  );
+  const prefixPatterns = [
+    /^for\s+(.+?),/i,
+    /^when\s+(.+?),/i,
+    /^during\s+(.+?),/i,
+  ];
 
-  if (!match) {
-    return [];
+  for (
+    const pattern
+    of prefixPatterns
+  ) {
+    const match =
+      text.match(pattern);
+
+    if (match) {
+      return cleanScope(
+        match[1],
+      );
+    }
   }
 
-  const scope = cleanScope(match[1]);
+  const suffixPatterns = [
+    /\bwith\s+(.+?)(?:[.,]|$)/i,
+    /\bfor\s+(.+?)(?:[.,]|$)/i,
+    /\bwhen\s+(.+?)(?:[.,]|$)/i,
+    /\bduring\s+(.+?)(?:[.,]|$)/i,
+  ];
 
-  return scope;
+  for (
+    const pattern
+    of suffixPatterns
+  ) {
+    const match =
+      text.match(pattern);
+
+    if (match) {
+      return cleanScope(
+        match[1],
+      );
+    }
+  }
+
+  return [];
 }
 
-/**
- * Priority memories often encode their scope as the
- * grammatical subject rather than after "for/with".
- *
- * Example:
- * "Hackathon work is urgent."
- *       ↓
- * scope = ["hackathon", "work"]
- */
 function extractUrgencyScope(
   text: string,
 ): string[] {
   const patterns = [
-    /^(.+?)\s+is\s+(?:currently\s+)?(?:urgent|high priority)/i,
+    /^(.+?)\s+is\s+(?:currently\s+)?urgent/i,
+
+    /^(.+?)\s+is\s+(?:currently\s+)?high priority/i,
 
     /^(.+?)\s+is\s+(?:currently\s+)?(?:the\s+)?(?:user'?s\s+)?top priority/i,
-
-    /^(.+?)\s+is\s+(?:currently\s+)?the most important/i,
 
     /^(.+?)\s+needs\s+(?:to be\s+)?(?:completed\s+)?urgently/i,
 
     /^(.+?)\s+needs\s+immediate attention/i,
 
-    /^(.+?)\s+deadline\s+is approaching/i,
+    /^(.+?)\s+needs\s+to\s+be\s+handled\s+right away/i,
+
+    /^(.+?)\s+cannot wait/i,
+
+    /^(.+?)\s+is\s+time-sensitive/i,
+
+    /^(.+?)\s+deadline\s+is\s+(?:approaching|close|near)/i,
   ];
 
-  for (const pattern of patterns) {
-    const match = text.match(pattern);
+  for (
+    const pattern
+    of patterns
+  ) {
+    const match =
+      text.match(pattern);
 
     if (match) {
-      return cleanScope(match[1]);
+      return cleanScope(
+        match[1],
+      );
     }
   }
 
-  return extractMarkedScope(text);
+  return extractScope(text);
 }
 
 function scopeMatchesInstruction(
   scope: string[],
   instruction: string,
 ): boolean {
-  // Empty scope = global preference.
-  if (scope.length === 0) {
+  if (
+    scope.length === 0
+  ) {
     return true;
   }
 
-  const instructionTokens = new Set(
-    tokenize(instruction),
-  );
+  const instructionTokens =
+    new Set(
+      tokenize(instruction),
+    );
 
-  return scope.some((token) =>
-    instructionTokens.has(token),
+  return scope.some(
+    (token) =>
+      instructionTokens.has(
+        token,
+      ),
+  );
+}
+
+/*
+ * ---------------------------
+ * POLARITY HELPERS
+ * ---------------------------
+ */
+
+function hasNegationNear(
+  text: string,
+  concept:
+    | "email"
+    | "morning"
+    | "remote"
+    | "urgent",
+): boolean {
+  const patterns:
+    Record<
+      typeof concept,
+      RegExp[]
+    > = {
+      email: [
+        /does not (?:prefer|like|want).*email/i,
+        /doesn't (?:prefer|like|want).*email/i,
+        /not.*email/i,
+        /used to prefer email/i,
+        /no longer prefers? email/i,
+        /prefers? in-app.*(?:over|rather than).*email/i,
+      ],
+
+      morning: [
+        /does not (?:prefer|like|want).*morning/i,
+        /doesn't (?:prefer|like|want).*morning/i,
+        /not morning/i,
+        /prefers? afternoon/i,
+        /rather.*afternoon.*than.*morning/i,
+        /used to prefer morning/i,
+        /no longer prefers? morning/i,
+      ],
+
+      remote: [
+        /does not (?:prefer|like|want).*(?:remote|virtual|online)/i,
+        /doesn't (?:prefer|like|want).*(?:remote|virtual|online)/i,
+        /prefers? .*in[- ]person.*(?:rather than|over).*(?:remote|virtual|online)/i,
+        /rather.*in[- ]person.*than.*(?:remote|virtual|online)/i,
+        /no longer prefers? .*remote/i,
+      ],
+
+      urgent: [
+        /no longer urgent/i,
+        /not urgent/i,
+        /isn't urgent/i,
+        /is not urgent/i,
+        /does not need immediate attention/i,
+        /can wait/i,
+        /used to be urgent/i,
+      ],
+    };
+
+  return patterns[
+    concept
+  ].some(
+    (pattern) =>
+      pattern.test(text),
+  );
+}
+
+/*
+ * ---------------------------
+ * SEMANTIC NORMALIZATION
+ * ---------------------------
+ */
+
+function meansMorning(
+  text: string,
+): boolean {
+  if (
+    hasNegationNear(
+      text,
+      "morning",
+    )
+  ) {
+    return false;
+  }
+
+  const directSignals = [
+    "morning",
+    "before noon",
+    "before lunch",
+    "earlier in the day",
+    "early in the day",
+    "first half of the day",
+    "first meeting slot",
+    "earliest meeting slot",
+    "early meeting",
+  ];
+
+  if (
+    containsAny(
+      text,
+      directSignals,
+    )
+  ) {
+    return true;
+  }
+
+  if (
+    text.includes(
+      "afternoon",
+    ) &&
+    containsAny(
+      text,
+      [
+        "avoid",
+        "dislike",
+        "inconvenient",
+        "doesn't work",
+        "does not work",
+      ],
+    )
+  ) {
+    return true;
+  }
+
+  /*
+   * Recognize morning time ranges.
+   *
+   * Example:
+   * "between 8 AM and 11 AM"
+   */
+  const hourMatches =
+    [
+      ...text.matchAll(
+        /\b(\d{1,2})\s*(am|pm)\b/gi,
+      ),
+    ];
+
+  if (
+    hourMatches.length > 0
+  ) {
+    const hasMorningTime =
+      hourMatches.some(
+        (match) =>
+          match[2]
+            .toLowerCase() ===
+          "am",
+      );
+
+    if (
+      hasMorningTime &&
+      containsAny(
+        text,
+        [
+          "available",
+          "prefer",
+          "best",
+          "works",
+          "convenient",
+        ],
+      )
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function meansRemote(
+  text: string,
+): boolean {
+  if (
+    hasNegationNear(
+      text,
+      "remote",
+    )
+  ) {
+    return false;
+  }
+
+  return containsAny(
+    text,
+    [
+      "remote",
+      "virtually",
+      "virtual meeting",
+      "virtual call",
+      "online meeting",
+      "online call",
+      "video meeting",
+      "video call",
+      "video conference",
+      "zoom",
+      "google meet",
+      "microsoft teams",
+      "meet from home",
+      "join from home",
+      "rather use zoom",
+    ],
+  ) ||
+    (
+      text.includes(
+        "avoid",
+      ) &&
+      containsAny(
+        text,
+        [
+          "meeting room",
+          "in person",
+          "in-person",
+          "physical meeting",
+        ],
+      )
+    );
+}
+
+function meansEmail(
+  text: string,
+): boolean {
+  if (
+    hasNegationNear(
+      text,
+      "email",
+    )
+  ) {
+    return false;
+  }
+
+  if (
+    containsAny(
+      text,
+      [
+        "email",
+        "e-mail",
+        "electronic mail",
+        "inbox",
+        "mailbox",
+        "written correspondence",
+      ],
+    )
+  ) {
+    return true;
+  }
+
+  if (
+    text.includes("in-app") &&
+    containsAny(
+      text,
+      [
+        "avoid",
+        "dislike",
+        "rather not",
+      ],
+    )
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function meansUrgent(
+  text: string,
+): boolean {
+  if (
+    hasNegationNear(
+      text,
+      "urgent",
+    )
+  ) {
+    return false;
+  }
+
+  return containsAny(
+    text,
+    [
+      "urgent",
+      "urgently",
+      "high priority",
+      "top priority",
+      "highest priority",
+      "immediate attention",
+      "right away",
+      "time-sensitive",
+      "time sensitive",
+      "cannot wait",
+      "can't wait",
+      "as soon as possible",
+      "asap",
+      "deadline is approaching",
+      "deadline is close",
+      "deadline is near",
+      "most important work",
+    ],
   );
 }
 
 function interpretMemory(
   memory: Memory,
 ): MemoryConstraint[] {
-  const text = memory.content.toLowerCase();
+  const text =
+    memory.content
+      .toLowerCase()
+      .trim();
 
-  const constraints: MemoryConstraint[] = [];
+  const constraints:
+    MemoryConstraint[] = [];
 
-  // ---------------------------------
-  // TIME PREFERENCE
-  // ---------------------------------
+  /*
+   * Scheduling time
+   */
+  const morningPositive =
+    meansMorning(text);
 
-  const morningPreference =
-    containsAny(text, [
+  const morningNegative =
+    !morningPositive &&
+    hasNegationNear(
+      text,
       "morning",
-      "before noon",
-      "earlier in the day",
-      "first half of the day",
-      "early meeting",
-    ]) ||
-    (
-      text.includes("avoid") &&
-      text.includes("afternoon")
     );
 
-  if (morningPreference) {
+  if (
+    morningPositive ||
+    morningNegative
+  ) {
     constraints.push({
       domain: "schedule",
       attribute: "time",
       value: "morning",
-      scope: extractMarkedScope(text),
+      polarity:
+        morningPositive
+          ? "positive"
+          : "negative",
+      scope:
+        extractScope(text),
       memory,
     });
   }
 
-  // ---------------------------------
-  // REMOTE MEETING PREFERENCE
-  // ---------------------------------
+  /*
+   * Scheduling location
+   */
+  const remotePositive =
+    meansRemote(text);
 
-  const remotePreference =
-    containsAny(text, [
+  const remoteNegative =
+    !remotePositive &&
+    hasNegationNear(
+      text,
       "remote",
-      "virtual meeting",
-      "video call",
-      "online meeting",
-      "join meetings from home",
-    ]) ||
-    (
-      text.includes("avoid") &&
-      text.includes("physical meeting")
     );
 
-  if (remotePreference) {
+  if (
+    remotePositive ||
+    remoteNegative
+  ) {
     constraints.push({
       domain: "schedule",
       attribute: "location",
       value: "remote",
-      scope: extractMarkedScope(text),
+      polarity:
+        remotePositive
+          ? "positive"
+          : "negative",
+      scope:
+        extractScope(text),
       memory,
     });
   }
 
-  // ---------------------------------
-  // COMMUNICATION PREFERENCE
-  // ---------------------------------
+  /*
+   * Message channel
+   */
+  const emailPositive =
+    meansEmail(text);
 
-  const emailPreference =
-    containsAny(text, [
+  const emailNegative =
+    !emailPositive &&
+    hasNegationNear(
+      text,
       "email",
-      "electronic mail",
-      "inbox",
-    ]) ||
-    (
-      text.includes("avoid") &&
-      text.includes("in-app")
     );
 
-  if (emailPreference) {
+  if (
+    emailPositive ||
+    emailNegative
+  ) {
     constraints.push({
       domain: "message",
       attribute: "channel",
       value: "email",
-      scope: extractMarkedScope(text),
+      polarity:
+        emailPositive
+          ? "positive"
+          : "negative",
+      scope:
+        extractScope(text),
       memory,
     });
   }
 
-  // ---------------------------------
-  // TASK PRIORITY
-  // ---------------------------------
+  /*
+   * Task priority
+   */
+  const urgentPositive =
+    meansUrgent(text);
 
-  const urgencyPreference =
-    containsAny(text, [
+  const urgentNegative =
+    !urgentPositive &&
+    hasNegationNear(
+      text,
       "urgent",
-      "urgently",
-      "high priority",
-      "top priority",
-      "immediate attention",
-      "most important",
-      "deadline is approaching",
-    ]);
+    );
 
-  if (urgencyPreference) {
+  if (
+    urgentPositive ||
+    urgentNegative
+  ) {
     constraints.push({
       domain: "task",
       attribute: "priority",
       value: "high",
-      scope: extractUrgencyScope(text),
+      polarity:
+        urgentPositive
+          ? "positive"
+          : "negative",
+      scope:
+        extractUrgencyScope(
+          text,
+        ),
       memory,
     });
   }
@@ -361,18 +738,25 @@ export function getApplicableConstraints(
   instruction: string,
   memories: Memory[],
 ): MemoryConstraint[] {
-  const domain = classifyInstruction(instruction);
+  const domain =
+    classifyInstruction(
+      instruction,
+    );
 
-  return memories
-    .flatMap(interpretMemory)
-    .filter(
-      (constraint) =>
-        constraint.domain === domain,
-    )
-    .filter((constraint) =>
+  const candidates =
+    memories.flatMap(
+      interpretMemory,
+    );
+
+  return candidates.filter(
+    (constraint) =>
+      constraint.domain ===
+        domain &&
+      constraint.polarity ===
+        "positive" &&
       scopeMatchesInstruction(
         constraint.scope,
         instruction,
       ),
-    );
+  );
 }
