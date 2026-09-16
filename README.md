@@ -103,7 +103,7 @@ docs/
   DEVPOST.md               Submission draft
 
 TEST_RESULTS.md             Detailed evaluation methodology and results
-
+```
 ## Local setup
 
 Requirements:
@@ -180,6 +180,7 @@ Latest full-suite result:
 ```text
 Test Files  6 passed (6)
 Tests       12 passed (12)
+```
 
 ## Attribution method
 
@@ -190,6 +191,7 @@ ShadowRecall removes each retrieved memory in turn and regenerates the memory-in
 If removing one memory eliminates both changed fields, that memory has:
 
 ```text
+2 / 2 changed fields explained
 ```
 
 The interface currently presents this as an attribution score. It represents field-level explanatory coverage, not universal statistical certainty.
@@ -276,7 +278,7 @@ For the complete evaluation history and limitations, see [`TEST_RESULTS.md`](TES
 
 ## AI-use disclosure
 
-AI-assisted development tools were used for brainstorming, implementation support, debugging, testing, and documentation. The submitted application’s integration, comparison engine, interface, tests, and project decisions were assembled and verified during the hackathon. The developer used ChatGPT Sola 5.6 during the course of the hackathon for the above purposes.
+AI-assisted development tools were used for brainstorming, implementation support, debugging, testing, and documentation. The submitted application’s integration, comparison engine, interface, tests, and project decisions were assembled and verified during the hackathon. The developer used ChatGPT during the course of the hackathon for the above purposes.
 
 ## License
 
