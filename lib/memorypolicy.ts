@@ -86,6 +86,12 @@ const GENERIC_SCOPE_WORDS = new Set([
   "talking",
   "session",
   "sessions",
+
+  // Generic conditions, not real semantic scope
+  "timing",
+  "flexible",
+  "possible",
+  "whenever",
 ]);
 
 function normalizeToken(
@@ -183,11 +189,15 @@ export function classifyInstruction(
 }
 
 /*
- * Extract context such as:
+ * Extracts contextual scope such as:
  *
  * "For alumni networking, ..."
  * "with professors"
  * "for tutoring sessions"
+ *
+ * But generic phrases such as
+ * "when timing is flexible"
+ * collapse to an empty scope.
  */
 function extractScope(
   text: string,
@@ -340,9 +350,9 @@ function hasNegationNear(
       remote: [
         /does not (?:prefer|like|want).*(?:remote|virtual|online)/i,
         /doesn't (?:prefer|like|want).*(?:remote|virtual|online)/i,
-        /prefers? .*in[- ]person.*(?:rather than|over).*(?:remote|virtual|online)/i,
+        /prefers?.*in[- ]person.*(?:rather than|over).*(?:remote|virtual|online)/i,
         /rather.*in[- ]person.*than.*(?:remote|virtual|online)/i,
-        /no longer prefers? .*remote/i,
+        /no longer prefers?.*remote/i,
       ],
 
       urgent: [
@@ -421,12 +431,6 @@ function meansMorning(
     return true;
   }
 
-  /*
-   * Recognize morning time ranges.
-   *
-   * Example:
-   * "between 8 AM and 11 AM"
-   */
   const hourMatches =
     [
       ...text.matchAll(
@@ -477,26 +481,27 @@ function meansRemote(
     return false;
   }
 
-  return containsAny(
-    text,
-    [
-      "remote",
-      "virtually",
-      "virtual meeting",
-      "virtual call",
-      "online meeting",
-      "online call",
-      "video meeting",
-      "video call",
-      "video conference",
-      "zoom",
-      "google meet",
-      "microsoft teams",
-      "meet from home",
-      "join from home",
-      "rather use zoom",
-    ],
-  ) ||
+  return (
+    containsAny(
+      text,
+      [
+        "remote",
+        "virtually",
+        "virtual meeting",
+        "virtual call",
+        "online meeting",
+        "online call",
+        "video meeting",
+        "video call",
+        "video conference",
+        "zoom",
+        "google meet",
+        "microsoft teams",
+        "meet from home",
+        "join from home",
+        "rather use zoom",
+      ],
+    ) ||
     (
       text.includes(
         "avoid",
@@ -510,7 +515,8 @@ function meansRemote(
           "physical meeting",
         ],
       )
-    );
+    )
+  );
 }
 
 function meansEmail(
