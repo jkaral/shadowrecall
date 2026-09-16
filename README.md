@@ -84,8 +84,8 @@ lib/
   backboard.ts             Server-side Backboard memory adapter
   demo.ts                  Guided deterministic scenario
   diff.ts                  Structured action comparison
-  memorypolicy.ts          Memory interpretation, scope, polarity, and relevance
-  planner2.ts              Context-aware deterministic action planner
+  memory-policy.ts          Memory interpretation, scope, polarity, and relevance
+  planner.ts              Context-aware deterministic action planner
   schema.ts                Request and action validation
   types.ts                 Shared TypeScript types
 
@@ -269,6 +269,7 @@ For the complete evaluation history and limitations, see [`TEST_RESULTS.md`](TES
 - Organization-level memory policies
 - Audit-history export
 - Automatic escalation for sensitive action fields
+- Independently generated held-out evaluation set for stronger generalization measurement
 
 ## Hackathon tracks
 
