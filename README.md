@@ -73,31 +73,36 @@ Backboard provides persistent memory storage and semantic retrieval. The local p
 ```text
 app/
   api/
-    analyze/route.ts     Analysis API
-    health/route.ts      Configuration health check
-  globals.css            Product styling
-  layout.tsx             Application layout
-  page.tsx               Main interface
+    analyze/route.ts       Analysis API
+    health/route.ts        Configuration health check
+  globals.css              Product styling
+  layout.tsx               Application layout
+  page.tsx                 Main interface
 
 lib/
-  analyze.ts             Live-memory experiment and attribution
-  backboard.ts           Server-side Backboard memory adapter
-  demo.ts                Guided deterministic scenario
-  diff.ts                Structured action comparison
-  planner.ts             Deterministic action planner
-  schema.ts              Request and action validation
-  types.ts               Shared TypeScript types
+  analyze.ts               Memory-conditioned experiment and attribution
+  backboard.ts             Server-side Backboard memory adapter
+  demo.ts                  Guided deterministic scenario
+  diff.ts                  Structured action comparison
+  memorypolicy.ts          Memory interpretation, scope, polarity, and relevance
+  planner2.ts              Context-aware deterministic action planner
+  schema.ts                Request and action validation
+  types.ts                 Shared TypeScript types
 
 tests/
-  demo.test.ts           Guided-demo tests
-  diff.test.ts           Difference-engine and risk tests
-  planner.test.ts        Structured-planner tests
+  demo.test.ts             Guided-demo tests
+  diff.test.ts             Difference-engine and risk tests
+  planner.test.ts          Structured-planner tests
+  evaluation.test.ts       Initial 6-scenario sanity evaluation
+  evaluation2.test.ts      40-scenario robustness benchmark
+  eval3.test.ts            40-scenario broader diagnostic benchmark
 
 docs/
-  ARCHITECTURE.md        Technical architecture
-  DEMO_SCRIPT.md         Presentation script
-  DEVPOST.md             Submission draft
-```
+  ARCHITECTURE.md          Technical architecture
+  DEMO_SCRIPT.md           Presentation script
+  DEVPOST.md               Submission draft
+
+TEST_RESULTS.md             Detailed evaluation methodology and results
 
 ## Local setup
 
@@ -163,13 +168,18 @@ Schedule the project review for the earliest available time.
 
 ## Verification
 
-The current MVP passes:
+The current automated suite contains:
 
-- 3 test files
-- 9 automated tests
-- TypeScript validation
-- Next.js production compilation
-- Production dependency audit with zero known vulnerabilities
+- **6 Vitest test files**
+- **12 automated tests**
+- Unit tests for planning, action differences, risk classification, and the guided demo
+- Three dedicated memory-influence evaluation suites
+
+Latest full-suite result:
+
+```text
+Test Files  6 passed (6)
+Tests       12 passed (12)
 
 ## Attribution method
 
@@ -180,10 +190,52 @@ ShadowRecall removes each retrieved memory in turn and regenerates the memory-in
 If removing one memory eliminates both changed fields, that memory has:
 
 ```text
-2 / 2 changed fields explained
 ```
 
 The interface currently presents this as an attribution score. It represents field-level explanatory coverage, not universal statistical certainty.
+
+## Memory-relevance evaluation
+
+ShadowRecall was evaluated using controlled paired scenarios in which the same instruction is planned with and without supplied memory.
+
+The evaluation measures whether memory changes an action **when it should**, while remaining inactive when the memory is irrelevant to the current request.
+
+### Evaluation progression
+
+The first 40-scenario robustness benchmark exposed severe weaknesses in the original keyword-oriented planner:
+
+| Metric | Original baseline |
+|---|---:|
+| Overall correctness | 2.5% |
+| Paraphrase handling | 0.0% |
+| Context-mismatch rejection | 5.0% |
+| False positives | 19 |
+| False negatives | 20 |
+
+The failure analysis motivated a redesign separating:
+
+1. memory interpretation;
+2. semantic scope extraction;
+3. contextual relevance checking;
+4. action generation.
+
+That redesign reached **97.5% correctness** on the same development benchmark, including **100% context-mismatch rejection**.
+
+A separate 40-scenario diagnostic evaluation then exposed additional weaknesses involving broader semantic paraphrases and negation. This led to a second redesign adding semantic normalization and explicit polarity handling.
+
+The current regression run on the 40-case robustness benchmark achieves:
+
+| Metric | Current result |
+|---|---:|
+| Overall correctness | **95.0%** |
+| Paraphrase handling | **90.0%** |
+| Context-mismatch rejection | **100.0%** |
+| False positives | **0** |
+| False negatives | **2** |
+
+These figures are development/regression results rather than claims of universal model accuracy. The benchmarks are controlled and hand-authored, and results from a benchmark are not treated as held-out once its failures have informed implementation changes.
+
+For the complete evaluation history and limitations, see [`TEST_RESULTS.md`](TEST_RESULTS.md).
 
 ## Security and reliability
 
@@ -197,10 +249,13 @@ The interface currently presents this as an attribution score. It represents fie
 
 ## Limitations
 
-- The MVP planner supports calendar, messaging, and task actions rather than arbitrary tools.
-- Available calendar slots are part of the controlled hackathon scenario.
-- Leave-one-out attribution may not detect complex interactions between multiple memories.
+- The planner supports a restricted set of calendar, messaging, and task actions rather than arbitrary tools.
+- Available calendar slots are part of the controlled demonstration environment.
+- Memory relevance is evaluated using hand-authored scenarios rather than a production-distributed benchmark.
+- Semantic normalization currently covers a bounded set of preference concepts and linguistic constructions.
+- Leave-one-out attribution may not capture interactions in which multiple memories jointly influence an action.
 - The attribution score measures changed-field coverage, not probabilistic causal certainty.
+- Development benchmark results should not be interpreted as unbiased held-out performance after those benchmarks have informed implementation changes.
 - The MVP simulates approval and does not execute external actions.
 
 ## Future work
