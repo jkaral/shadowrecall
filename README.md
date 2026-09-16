@@ -46,13 +46,17 @@ Backboard provides persistent memory storage and semantic retrieval. The local p
 - Calendar, messaging, and task action schemas
 - Field-level structured action differences
 - Leave-one-memory-out counterfactual attribution
+- Structured memory-constraint interpretation
+- Context-aware memory relevance filtering
+- Semantic normalization for equivalent preference wording
+- Positive/negative polarity handling for negated memories
 - Risk classification for consequential changes
 - Human approval gate
 - Guided offline demonstration
 - Server-side credential protection
 - Runtime request validation
 - Responsive interface
-- Automated unit tests
+- Automated unit and robustness testing
 
 ## Technology
 
